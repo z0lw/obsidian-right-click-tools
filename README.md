@@ -1,21 +1,37 @@
 # Obsidian Right-Click Tools
 
-右クリック操作を強化する軽量プラグインです。ファイル/フォルダの移行と、今日の日付フォルダ（`YYYY-MM-DD`）の作成に対応します。
+Lightweight plugin to enhance the file explorer’s context menu.
 
-## 同梱ファイル（ランタイムのみ）
+- Create today’s date folder (`YYYY-MM-DD`). If it already exists, auto-increments to `YYYY-MM-DD_1`, `_2`, …
+- Move selected file(s)/folder(s) to a configurable destination folder.
+
+## Files
 - `main.js`
 - `manifest.json`
 - `styles.css`
 
-## インストール（ビルド不要）
-- 3ファイルを `/<Your Vault>/.obsidian/plugins/obsidian-right-click-tools/` に配置
-- Obsidian → 設定 → コミュニティプラグイン → 「Right-Click Tools」を有効化
+## Installation (no build)
+Place the three files in `/<Your Vault>/.obsidian/plugins/obsidian-right-click-tools/` and enable “Right-Click Tools” in Obsidian’s Community Plugins.
 
-## 使い方
-- 今日のフォルダ作成: エクスプローラで右クリック → 「今日の日付のフォルダを作成」
-  - 既に存在する場合は `YYYY-MM-DD_1`, `_2`… と連番を付与
-- ファイル/フォルダの移行: エクスプローラで右クリック → 「<設定値>」に移行
-  - 設定タブから移行先フォルダ名を指定可能
+## Requirements
+- Obsidian v1.5.0+
 
-## 要件
-- Obsidian v1.5.0 以降
+---
+
+## 日本語説明
+ファイルエクスプローラの右クリック操作を拡張する軽量プラグインです。
+
+- 今日の日付フォルダ（`YYYY-MM-DD`）を作成。既に存在する場合は `YYYY-MM-DD_1`, `_2` … と連番を付与します。
+- 選択したファイル／フォルダを、設定で指定したフォルダへ移動します。
+
+### 同梱ファイル（ランタイムのみ）
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+### インストール（ビルド不要）
+上記 3 ファイルを `/<Your Vault>/.obsidian/plugins/obsidian-right-click-tools/` に配置し、Obsidian の「コミュニティプラグイン」で “Right-Click Tools” を有効にしてください。
+
+### 要件
+- Obsidian v1.5.0 以上
+
