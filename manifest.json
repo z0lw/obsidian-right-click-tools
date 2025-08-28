@@ -1,11 +1,11 @@
 {
-	"id": "obsidian-file-mover",
-	"name": "File Mover",
-	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
-	"description": "ファイルやフォルダを事前指定されたフォルダに、元のフォルダ構造を維持したまま移行できるプラグインです。右クリックメニューから簡単に実行できます。",
-	"author": "Your Name",
-	"authorUrl": "",
-	"fundingUrl": "",
-	"isDesktopOnly": false
+  "id": "right-click-tools",
+  "name": "Right-Click Tools",
+  "version": "1.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "右クリックからのファイル移行と『今日の日付』フォルダ作成を提供。",
+  "author": "You",
+  "authorUrl": "",
+  "fundingUrl": "",
+  "isDesktopOnly": false
 }
