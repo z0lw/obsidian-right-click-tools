@@ -150,6 +150,17 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     try {
       await this.app.vault.createFolder(folderPath);
       new import_obsidian.Notice(`作成: ${folderPath}`);
+      // Create an untitled note inside the newly created folder
+      const untitledBase = "無題のファイル";
+      const ext = ".md";
+      let notePath = import_obsidian.normalizePath(`${folderPath}/${untitledBase}${ext}`);
+      let noteCounter = 1;
+      while (this.app.vault.getAbstractFileByPath(notePath)) {
+        notePath = import_obsidian.normalizePath(`${folderPath}/${untitledBase} (${noteCounter})${ext}`);
+        noteCounter += 1;
+      }
+      await this.app.vault.create(notePath, "");
+      new import_obsidian.Notice(`作成: ${notePath}`);
     } catch (e) {
       console.error(e);
       new import_obsidian.Notice("フォルダ作成に失敗しました。コンソールを確認してください。", 5e3);
