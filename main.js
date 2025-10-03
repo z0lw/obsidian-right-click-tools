@@ -159,8 +159,12 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
         notePath = import_obsidian.normalizePath(`${folderPath}/${untitledBase} (${noteCounter})${ext}`);
         noteCounter += 1;
       }
-      await this.app.vault.create(notePath, "");
+      const noteFile = await this.app.vault.create(notePath, "");
       new import_obsidian.Notice(`作成: ${notePath}`);
+      const leaf = this.app.workspace.getLeaf(true);
+      if (leaf) {
+        await leaf.openFile(noteFile);
+      }
     } catch (e) {
       console.error(e);
       new import_obsidian.Notice("フォルダ作成に失敗しました。コンソールを確認してください。", 5e3);
