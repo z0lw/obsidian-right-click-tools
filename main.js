@@ -29,7 +29,10 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
-  targetFolder: "Archive"
+  targetFolder: "Archive",
+  enableMoveContext: true,
+  enableCreateTodayFolder: true,
+  enableCreateTodayNote: true
 };
 var FileMoverPlugin = class extends import_obsidian.Plugin {
   async onload() {
@@ -39,26 +42,53 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     this.addCommand({
       id: "create-today-folder",
       name: "今日の日付のフォルダを作成",
-      callback: () => this.createTodayFolder(this.app.vault.getRoot())
+      checkCallback: (checking) => {
+        if (!this.settings.enableCreateTodayFolder)
+          return false;
+        if (!checking)
+          this.createTodayFolder(this.app.vault.getRoot());
+        return true;
+      }
+    });
+    this.addCommand({
+      id: "create-today-note",
+      name: "今日の日付のノートを作成",
+      checkCallback: (checking) => {
+        if (!this.settings.enableCreateTodayNote)
+          return false;
+        if (!checking)
+          this.createTodayNote(this.app.vault.getRoot());
+        return true;
+      }
     });
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         const tf = this.settings && this.settings.targetFolder ? this.settings.targetFolder : "";
-        const moveLabel = tf ? `「${this.settings.targetFolder}」に移行` : "\u6307\u5B9A\u30D5\u30A9\u30EB\u30C0\u306B\u79FB\u884C";
-        menu.addItem((item) => {
-          item.setTitle(moveLabel).setIcon("folder-plus").onClick(async () => {
-            if (file instanceof import_obsidian.TFile || file instanceof import_obsidian.TFolder) {
-              await this.moveFileOrFolder(file);
-            }
-          });
-        });
-        // Add: create today's date folder under target folder
         const targetFolder = file instanceof import_obsidian.TFolder ? file : (file && file.parent ? file.parent : this.app.vault.getRoot());
-        menu.addItem((item) => {
-          item.setTitle("今日の日付のフォルダを作成").setIcon("folder").onClick(async () => {
-            await this.createTodayFolder(targetFolder);
+        if (this.settings.enableMoveContext) {
+          const moveLabel = tf ? `「${this.settings.targetFolder}」に移行` : "\u6307\u5B9A\u30D5\u30A9\u30EB\u30C0\u306B\u79FB\u884C";
+          menu.addItem((item) => {
+            item.setTitle(moveLabel).setIcon("folder-plus").onClick(async () => {
+              if (file instanceof import_obsidian.TFile || file instanceof import_obsidian.TFolder) {
+                await this.moveFileOrFolder(file);
+              }
+            });
           });
-        });
+        }
+        if (this.settings.enableCreateTodayFolder) {
+          menu.addItem((item) => {
+            item.setTitle("今日の日付のフォルダを作成").setIcon("folder").onClick(async () => {
+              await this.createTodayFolder(targetFolder);
+            });
+          });
+        }
+        if (this.settings.enableCreateTodayNote) {
+          menu.addItem((item) => {
+            item.setTitle("今日の日付のノートを作成").setIcon("file-plus").onClick(async () => {
+              await this.createTodayNote(targetFolder);
+            });
+          });
+        }
       })
     );
   }
@@ -170,6 +200,29 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
       new import_obsidian.Notice("フォルダ作成に失敗しました。コンソールを確認してください。", 5e3);
     }
   }
+  async createTodayNote(parent) {
+    const parentPath = (parent && parent.path) ? parent.path : "/";
+    const baseName = this.formatToday();
+    const dirPath = (parentPath === "/" || parentPath === "") ? "" : parentPath;
+    let notePath = import_obsidian.normalizePath(dirPath ? `${dirPath}/${baseName}.md` : `${baseName}.md`);
+    let suffix = 0;
+    while (this.app.vault.getAbstractFileByPath(notePath)) {
+      suffix += 1;
+      const name = `${baseName}_${suffix}.md`;
+      notePath = import_obsidian.normalizePath(dirPath ? `${dirPath}/${name}` : name);
+    }
+    try {
+      const noteFile = await this.app.vault.create(notePath, "");
+      new import_obsidian.Notice(`作成: ${notePath}`);
+      const leaf = this.app.workspace.getLeaf(true);
+      if (leaf) {
+        await leaf.openFile(noteFile);
+      }
+    } catch (e) {
+      console.error(e);
+      new import_obsidian.Notice("ノート作成に失敗しました。コンソールを確認してください。", 5e3);
+    }
+  }
 };
 var FileMoverSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -182,6 +235,18 @@ var FileMoverSettingTab = class extends import_obsidian.PluginSettingTab {
     containerEl.createEl("h2", { text: "Right-Click Tools Settings" });
     new import_obsidian.Setting(containerEl).setName("\u79FB\u884C\u5148\u30D5\u30A9\u30EB\u30C0").setDesc("\u30D5\u30A1\u30A4\u30EB\u30FB\u30D5\u30A9\u30EB\u30C0\u3092\u79FB\u884C\u3059\u308B\u5148\u306E\u30D5\u30A9\u30EB\u30C0\u540D\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044").addText((text) => text.setPlaceholder("Archive").setValue(this.plugin.settings.targetFolder).onChange(async (value) => {
       this.plugin.settings.targetFolder = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u79FB\u884C\u30E1\u30CB\u30E5\u30FC\u3092\u8868\u793A").setDesc("\u53F3\u30AF\u30EA\u30C3\u30AF\u30E1\u30CB\u30E5\u30FC\u306B\u300C\u6307\u5B9A\u30D5\u30A9\u30EB\u30C0\u306B\u79FB\u884C\u300D\u3092\u8868\u793A\u3057\u307E\u3059").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableMoveContext).onChange(async (value) => {
+      this.plugin.settings.enableMoveContext = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u65E5\u4ED8\u30D5\u30A9\u30EB\u30C0\u3092\u4F5C\u6210").setDesc("\u65E5\u4ED8\u3067\u30D5\u30A9\u30EB\u30C0\u3092\u4F5C\u6210\u3059\u308B\u6A5F\u80FD\u3092\u5229\u7528\u53EF\u306B\u3057\u307E\u3059").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableCreateTodayFolder).onChange(async (value) => {
+      this.plugin.settings.enableCreateTodayFolder = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u65E5\u4ED8\u30CE\u30FC\u30C8\u3092\u4F5C\u6210").setDesc("\u65E5\u4ED8\u3067\u30CE\u30FC\u30C8\u3092\u4F5C\u6210\u3059\u308B\u6A5F\u80FD\u3092\u5229\u7528\u53EF\u306B\u3057\u307E\u3059").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableCreateTodayNote).onChange(async (value) => {
+      this.plugin.settings.enableCreateTodayNote = value;
       await this.plugin.saveSettings();
     }));
     containerEl.createEl("p", {
