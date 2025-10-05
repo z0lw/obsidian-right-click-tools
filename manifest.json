@@ -1,9 +1,9 @@
 {
   "id": "right-click-tools",
   "name": "Right-Click Tools",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "minAppVersion": "1.5.0",
-  "description": "Adds Explorer right-click actions: create today’s date folder or note (auto-increments if they exist) and move selected items to a configurable folder.",
+  "description": "Adds Explorer right-click actions and a ribbon button to create today’s date folder or note and move selected items to a configurable folder.",
   "author": "z0lw",
   "authorUrl": "https://github.com/z0lw",
   "fundingUrl": "",
