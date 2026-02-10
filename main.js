@@ -93,6 +93,28 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
         }
       })
     );
+    this.registerEvent(
+      this.app.workspace.on("files-menu", (menu, files) => {
+        if (this.settings.enableMoveContext) {
+          const tf = this.settings && this.settings.targetFolder ? this.settings.targetFolder : "";
+          const moveLabel = tf ? `「${this.settings.targetFolder}」に移行` : "\u6307\u5B9A\u30D5\u30A9\u30EB\u30C0\u306B\u79FB\u884C";
+          menu.addItem((item) => {
+            item.setTitle(moveLabel).setIcon("folder-plus").onClick(async () => {
+              let movedCount = 0;
+              for (const file of files) {
+                if (file instanceof import_obsidian.TFile || file instanceof import_obsidian.TFolder) {
+                  await this.moveFileOrFolder(file);
+                  movedCount++;
+                }
+              }
+              if (movedCount > 1) {
+                new import_obsidian.Notice(`${movedCount} \u4EF6\u3092 ${this.settings.targetFolder} \u306B\u79FB\u884C\u3057\u307E\u3057\u305F`);
+              }
+            });
+          });
+        }
+      })
+    );
     this.refreshRibbonButton();
   }
   onunload() {
