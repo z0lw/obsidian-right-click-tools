@@ -57,7 +57,7 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     });
     this.addCommand({
       id: "create-today-note",
-      name: "\u4ECA\u65E5\u306E\u65E5\u4ED8\u306E\u30CE\u30FC\u30C8\u3092\u4F5C\u6210",
+      name: "デイリーノートを作成",
       checkCallback: (checking) => {
         if (!this.settings.enableCreateTodayNote)
           return false;
@@ -88,7 +88,7 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
         }
         if (this.settings.enableCreateTodayNote) {
           menu.addItem((item) => {
-            item.setTitle("\u4ECA\u65E5\u306E\u65E5\u4ED8\u306E\u30CE\u30FC\u30C8\u3092\u4F5C\u6210").setIcon("file-plus").onClick(async () => {
+            item.setTitle("デイリーノートを作成").setIcon("file-plus").onClick(async () => {
               await this.createTodayNote(targetFolder);
             });
           });
