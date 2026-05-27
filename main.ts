@@ -16,6 +16,7 @@ interface RightClickToolsSettings {
 	enableCreateTodayFolder: boolean;
 	enableCreateTodayNote: boolean;
 	todayNoteFolder: string;
+	todayNoteTemplate: string;
 	enableRibbonTodayNote: boolean;
 }
 
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: RightClickToolsSettings = {
 	enableCreateTodayFolder: true,
 	enableCreateTodayNote: true,
 	todayNoteFolder: '',
+	todayNoteTemplate: '',
 	enableRibbonTodayNote: true,
 };
 
@@ -48,7 +50,7 @@ export default class FileMoverPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'create-today-note',
-			name: '今日の日付のノートを作成',
+			name: 'デイリーノートを作成',
 			checkCallback: (checking) => {
 				if (!this.settings.enableCreateTodayNote) return false;
 				if (!checking) void this.createTodayNote(this.app.vault.getRoot());
@@ -87,7 +89,7 @@ export default class FileMoverPlugin extends Plugin {
 				if (this.settings.enableCreateTodayNote) {
 					menu.addItem((item: MenuItem) => {
 						item
-							.setTitle('今日の日付のノートを作成')
+							.setTitle('デイリーノートを作成')
 							.setIcon('file-plus')
 							.onClick(async () => {
 								await this.createTodayNote(targetFolder);
@@ -216,6 +218,37 @@ export default class FileMoverPlugin extends Plugin {
 		return `${yyyy}-${mm}-${dd}`;
 	}
 
+	private formatTime() {
+		const now = new Date();
+		const hh = String(now.getHours()).padStart(2, '0');
+		const min = String(now.getMinutes()).padStart(2, '0');
+		return `${hh}:${min}`;
+	}
+
+	private renderTemplate(content: string, title: string) {
+		const date = this.formatToday();
+		const time = this.formatTime();
+		return content
+			.replace(/\{\{\s*date\s*\}\}/gi, date)
+			.replace(/\{\{\s*time\s*\}\}/gi, time)
+			.replace(/\{\{\s*title\s*\}\}/gi, title);
+	}
+
+	private async getTodayNoteTemplateContent(baseName: string) {
+		const templatePath = (this.settings.todayNoteTemplate || '').trim();
+		if (!templatePath) return '';
+
+		const normalizedPath = normalizePath(templatePath.endsWith('.md') ? templatePath : `${templatePath}.md`);
+		const templateFile = this.app.vault.getAbstractFileByPath(normalizedPath);
+		if (!(templateFile instanceof TFile)) {
+			new Notice(`テンプレートが見つかりません: ${normalizedPath}`, 5000);
+			return '';
+		}
+
+		const content = await this.app.vault.read(templateFile);
+		return this.renderTemplate(content, baseName);
+	}
+
 	private async createTodayFolder(parent: TFolder) {
 		const parentPath = parent?.path ? parent.path : '/';
 		const baseName = this.formatToday();
@@ -281,7 +314,8 @@ export default class FileMoverPlugin extends Plugin {
 		}
 
 		try {
-			const noteFile = await this.app.vault.create(notePath, '');
+			const noteContent = await this.getTodayNoteTemplateContent(baseName);
+			const noteFile = await this.app.vault.create(notePath, noteContent);
 			new Notice(`作成: ${notePath}`);
 
 			const leaf = this.app.workspace.getLeaf(true);
@@ -383,6 +417,17 @@ class FileMoverSettingTab extends PluginSettingTab {
 					this.plugin.settings.todayNoteFolder = value;
 					await this.plugin.saveSettings();
 					this.plugin.refreshRibbonButton();
+				}));
+
+		new Setting(containerEl)
+			.setName('日付ノートテンプレート')
+			.setDesc('日付ノート作成時に読み込むテンプレートノートのパスを設定します')
+			.addText((text) => text
+				.setPlaceholder('9_Template/daily-note')
+				.setValue(this.plugin.settings.todayNoteTemplate)
+				.onChange(async (value) => {
+					this.plugin.settings.todayNoteTemplate = value;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)
