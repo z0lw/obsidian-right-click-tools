@@ -352,7 +352,7 @@ var FileMoverSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Right-Click Tools Settings" });
+    new import_obsidian.Setting(containerEl).setName("Right-Click Tools Settings").setHeading();
     new import_obsidian.Setting(containerEl).setName("\u79FB\u884C\u5148\u30D5\u30A9\u30EB\u30C0").setDesc("\u30D5\u30A1\u30A4\u30EB\u30FB\u30D5\u30A9\u30EB\u30C0\u3092\u79FB\u884C\u3059\u308B\u5148\u306E\u30D5\u30A9\u30EB\u30C0\u540D\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044").addText((text) => text.setPlaceholder("Archive").setValue(this.plugin.settings.targetFolder).onChange(async (value) => {
       this.plugin.settings.targetFolder = value;
       await this.plugin.saveSettings();

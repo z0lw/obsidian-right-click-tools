@@ -407,7 +407,9 @@ class FileMoverSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		containerEl.createEl('h2', { text: 'Right-Click Tools Settings' });
+		new Setting(containerEl)
+			.setName('Right-Click Tools Settings')
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName('移行先フォルダ')
