@@ -1,7 +1,7 @@
 {
 	"id": "right-click-tools",
 	"name": "Right-Click Tools",
-	"version": "1.8.1",
+	"version": "1.8.2",
 	"minAppVersion": "1.5.0",
 	"description": "Adds Explorer actions, daily notes creation, and multiple ribbon targets.",
 	"author": "z0lw",
