@@ -7,6 +7,7 @@ import {
 	Setting,
 	TFile,
 	TFolder,
+	moment,
 	normalizePath,
 } from 'obsidian';
 
@@ -16,9 +17,19 @@ interface RightClickToolsSettings {
 	enableCreateTodayFolder: boolean;
 	enableCreateTodayNote: boolean;
 	todayNoteFolder: string;
+	todayDateFormat: string;
+	ribbonTodayNoteTargets: RibbonTodayNoteTarget[];
 	todayNoteTemplate: string;
 	enableRibbonTodayNote: boolean;
 }
+
+interface RibbonTodayNoteTarget {
+	name: string;
+	folder: string;
+}
+
+const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD';
+const UNSAFE_DATE_OUTPUT = /[\\/:*?"<>|\u0000-\u001F\u007F]/;
 
 const DEFAULT_SETTINGS: RightClickToolsSettings = {
 	targetFolder: 'Archive',
@@ -26,13 +37,15 @@ const DEFAULT_SETTINGS: RightClickToolsSettings = {
 	enableCreateTodayFolder: true,
 	enableCreateTodayNote: true,
 	todayNoteFolder: '',
+	todayDateFormat: DEFAULT_DATE_FORMAT,
+	ribbonTodayNoteTargets: [],
 	todayNoteTemplate: '',
 	enableRibbonTodayNote: true,
 };
 
 export default class FileMoverPlugin extends Plugin {
 	settings: RightClickToolsSettings;
-	private ribbonEl: HTMLElement | null = null;
+	private ribbonEls: HTMLElement[] = [];
 
 	async onload() {
 		await this.loadSettings();
@@ -47,7 +60,6 @@ export default class FileMoverPlugin extends Plugin {
 				return true;
 			},
 		});
-
 		this.addCommand({
 			id: 'create-today-note',
 			name: 'デイリーノートを作成',
@@ -131,7 +143,31 @@ export default class FileMoverPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data = await this.loadData() as Partial<RightClickToolsSettings> | null;
+		this.settings = {
+			targetFolder: data?.targetFolder ?? DEFAULT_SETTINGS.targetFolder,
+			enableMoveContext: data?.enableMoveContext ?? DEFAULT_SETTINGS.enableMoveContext,
+			enableCreateTodayFolder: data?.enableCreateTodayFolder ?? DEFAULT_SETTINGS.enableCreateTodayFolder,
+			enableCreateTodayNote: data?.enableCreateTodayNote ?? DEFAULT_SETTINGS.enableCreateTodayNote,
+			todayNoteFolder: data?.todayNoteFolder ?? DEFAULT_SETTINGS.todayNoteFolder,
+			todayDateFormat: data?.todayDateFormat ?? DEFAULT_SETTINGS.todayDateFormat,
+			ribbonTodayNoteTargets: data?.ribbonTodayNoteTargets ?? DEFAULT_SETTINGS.ribbonTodayNoteTargets,
+			todayNoteTemplate: data?.todayNoteTemplate ?? DEFAULT_SETTINGS.todayNoteTemplate,
+			enableRibbonTodayNote: data?.enableRibbonTodayNote ?? DEFAULT_SETTINGS.enableRibbonTodayNote,
+		};
+		if (typeof this.settings.todayDateFormat !== 'string') {
+			this.settings.todayDateFormat = DEFAULT_DATE_FORMAT;
+		}
+		if (!Array.isArray(data?.ribbonTodayNoteTargets)) {
+			const folder = typeof data?.todayNoteFolder === 'string' ? data.todayNoteFolder.trim() : '';
+			this.settings.ribbonTodayNoteTargets = folder ? [{
+				name: folder.split('/').filter(Boolean).pop() || folder,
+				folder,
+			}] : [];
+			await this.saveSettings();
+		}
+		this.settings.ribbonTodayNoteTargets = this.settings.ribbonTodayNoteTargets.map((target) => ({ name: target.name, folder: target.folder }));
+		await this.saveSettings();
 	}
 
 	async saveSettings() {
@@ -211,11 +247,19 @@ export default class FileMoverPlugin extends Plugin {
 	}
 
 	private formatToday() {
-		const now = new Date();
-		const yyyy = now.getFullYear();
-		const mm = String(now.getMonth() + 1).padStart(2, '0');
-		const dd = String(now.getDate()).padStart(2, '0');
-		return `${yyyy}-${mm}-${dd}`;
+		const format = (this.settings.todayDateFormat || '').trim() || DEFAULT_DATE_FORMAT;
+		let output = '';
+		try {
+			output = moment().format(format).trim();
+		} catch (error) {
+			console.error('Date format error:', error);
+		}
+
+		if (!output || output === '.' || output === '..' || output.endsWith('.') || UNSAFE_DATE_OUTPUT.test(output)) {
+			new Notice(`日付の書式「${format}」の結果がファイル名に使えないため、${DEFAULT_DATE_FORMAT}を使用します。`, 5000);
+			return moment().format(DEFAULT_DATE_FORMAT);
+		}
+		return output;
 	}
 
 	private formatTime() {
@@ -226,10 +270,9 @@ export default class FileMoverPlugin extends Plugin {
 	}
 
 	private renderTemplate(content: string, title: string) {
-		const date = this.formatToday();
 		const time = this.formatTime();
 		return content
-			.replace(/\{\{\s*date\s*\}\}/gi, date)
+			.replace(/\{\{\s*date\s*\}\}/gi, title)
 			.replace(/\{\{\s*time\s*\}\}/gi, time)
 			.replace(/\{\{\s*title\s*\}\}/gi, title);
 	}
@@ -327,25 +370,25 @@ export default class FileMoverPlugin extends Plugin {
 	}
 
 	private removeRibbonButton() {
-		this.ribbonEl?.remove();
-		this.ribbonEl = null;
+		for (const ribbon of this.ribbonEls) ribbon.remove();
+		this.ribbonEls = [];
 	}
 
 	refreshRibbonButton() {
 		this.removeRibbonButton();
 		if (!this.settings.enableRibbonTodayNote) return;
 
-		const ribbon = this.addRibbonIcon('calendar-plus', '指定フォルダに今日の日付ノートを作成', async () => {
-			const folderPath = (this.settings.todayNoteFolder || '').trim();
-			if (!folderPath) {
-				new Notice('設定画面で日付ノート用フォルダを指定してください。', 5000);
-				return;
-			}
-			await this.createTodayNote(null, folderPath);
-		});
-
-		ribbon.setAttribute('aria-label', '指定フォルダに今日の日付ノートを作成');
-		this.ribbonEl = ribbon;
+		for (const target of this.settings.ribbonTodayNoteTargets) {
+			const folderPath = typeof target.folder === 'string' ? target.folder.trim() : '';
+			if (!folderPath) continue;
+			const label = (typeof target.name === 'string' ? target.name.trim() : '') || folderPath;
+			const tooltip = `「${label}」(${folderPath})に今日の日付ノートを作成`;
+			const ribbon = this.addRibbonIcon('calendar-plus', tooltip, async () => {
+				await this.createTodayNote(null, folderPath);
+			});
+			ribbon.setAttribute('aria-label', tooltip);
+			this.ribbonEls.push(ribbon);
+		}
 	}
 
 	private getErrorMessage(error: unknown) {
@@ -409,14 +452,59 @@ class FileMoverSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('日付ノートの保存先フォルダ')
-			.setDesc('リボンボタンから作成する日付ノートの保存先を設定します')
-			.addText((text) => text
-				.setPlaceholder('Daily Notes')
-				.setValue(this.plugin.settings.todayNoteFolder)
-				.onChange(async (value) => {
-					this.plugin.settings.todayNoteFolder = value;
+			.setDesc('リボンボタンごとに表示名と保存先フォルダを設定します');
+		const targetsContainer = containerEl.createDiv();
+		this.plugin.settings.ribbonTodayNoteTargets.forEach((target, index) => {
+			const row = targetsContainer.createDiv();
+			new Setting(row)
+				.setName(`リボンボタン ${index + 1}`)
+				.addText((text) => text
+					.setPlaceholder('表示名')
+					.setValue(target.name)
+					.onChange(async (value) => {
+						target.name = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshRibbonButton();
+					}));
+			new Setting(row)
+				.setName('保存先')
+				.addText((text) => text
+					.setPlaceholder('Daily Notes')
+					.setValue(target.folder)
+					.onChange(async (value) => {
+						target.folder = value;
+						await this.plugin.saveSettings();
+						this.plugin.refreshRibbonButton();
+					}));
+			new Setting(row)
+				.addButton((button) => button
+					.setButtonText('削除')
+					.onClick(async () => {
+						this.plugin.settings.ribbonTodayNoteTargets.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.plugin.refreshRibbonButton();
+						this.display();
+					}));
+		});
+		new Setting(containerEl)
+			.addButton((button) => button
+				.setButtonText('ボタンを追加')
+				.onClick(async () => {
+					this.plugin.settings.ribbonTodayNoteTargets.push({ name: '', folder: '' });
 					await this.plugin.saveSettings();
 					this.plugin.refreshRibbonButton();
+					this.display();
+				}));
+
+		new Setting(containerEl)
+			.setName('日付の書式')
+			.setDesc('Moment形式で指定します。例: YYYY-MM-DD、YYYY年MM月DD日。ノート名・日付フォルダ名・テンプレートの{{date}}に適用されます。')
+			.addMomentFormat((format) => format
+				.setDefaultFormat(DEFAULT_DATE_FORMAT)
+				.setValue(this.plugin.settings.todayDateFormat)
+				.onChange(async (value) => {
+					this.plugin.settings.todayDateFormat = value;
+					await this.plugin.saveSettings();
 				}));
 
 		new Setting(containerEl)

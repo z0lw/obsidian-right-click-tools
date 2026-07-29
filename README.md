@@ -2,14 +2,12 @@
 
 Lightweight plugin to enhance the file explorer’s context menu.
 
-- Create today’s date folder (`YYYY-MM-DD`). If it already exists, auto-increments to `YYYY-MM-DD_1`, `_2`, …
-- Create today’s date note (`YYYY-MM-DD.md`). If it already exists, auto-increments to `YYYY-MM-DD_1.md`, `_2.md`, …
+- Create today’s date folder and note using a configurable Moment date format (default `YYYY-MM-DD`). If it already exists, auto-increments with `_1`, `_2`, …
 - Create today’s daily note from a configurable template.
 - Move selected file(s)/folder(s) to a configurable destination folder.
-- Add an optional ribbon button for creating today’s date note in a configured folder.
+- Add optional ribbon buttons for creating today’s date notes in multiple configured folders, each with a custom display name.
 
-## Privacy and network use
-This plugin does not access the network, use telemetry, or send vault data to external services.
+AI title/tag generation has moved to a separate plugin, “AI Note Assistant”.
 
 ## Files
 - `main.js`
@@ -27,12 +25,13 @@ Place the three files in `/<Your Vault>/.obsidian/plugins/obsidian-right-click-t
 ## 日本語説明
 ファイルエクスプローラの右クリック操作を拡張する軽量プラグインです。
 
-- 今日の日付フォルダ（`YYYY-MM-DD`）を作成。既に存在する場合は `YYYY-MM-DD_1`, `_2` … と連番を付与します。
+- 設定したMoment形式（既定 `YYYY-MM-DD`）で今日の日付フォルダとノートを作成。既に存在する場合は `_1`, `_2` … と連番を付与します。
 - テンプレートを使って今日のデイリーノートを作成します。
 - 選択したファイル／フォルダを、設定で指定したフォルダへ移動します。
+- 表示名と保存先フォルダを複数登録し、それぞれのリボンボタンから今日のデイリーノートを作成できます。
+- 「日付の書式」でMoment形式（例: `YYYY-MM-DD`、`YYYY年MM月DD日`）を選択できます。ノート名・日付フォルダ名・テンプレートの`{{date}}`に適用されます。
 
-### プライバシーと外部通信
-このプラグインは外部通信、テレメトリ、Vaultデータの外部送信を行いません。
+AIによるタイトル・タグ生成機能は別プラグイン「AI Note Assistant」へ分離しました。
 
 ### 同梱ファイル（ランタイムのみ）
 - `main.js`

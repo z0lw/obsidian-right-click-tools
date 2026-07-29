@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-right-click-tools",
-	"version": "1.4.0",
-	"description": "Adds Explorer right-click actions to create today's date folder or note from a configurable template and move selected items to a configurable folder.",
+	"version": "1.8.0",
+	"description": "Adds Explorer actions, daily notes creation, and multiple ribbon targets.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

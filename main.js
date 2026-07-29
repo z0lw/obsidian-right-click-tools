@@ -28,19 +28,23 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
+var DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
+var UNSAFE_DATE_OUTPUT = /[\\/:*?"<>|\u0000-\u001F\u007F]/;
 var DEFAULT_SETTINGS = {
   targetFolder: "Archive",
   enableMoveContext: true,
   enableCreateTodayFolder: true,
   enableCreateTodayNote: true,
   todayNoteFolder: "",
+  todayDateFormat: DEFAULT_DATE_FORMAT,
+  ribbonTodayNoteTargets: [],
   todayNoteTemplate: "",
   enableRibbonTodayNote: true
 };
 var FileMoverPlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
-    this.ribbonEl = null;
+    this.ribbonEls = [];
   }
   async onload() {
     await this.loadSettings();
@@ -122,7 +126,32 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     this.removeRibbonButton();
   }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    const data = await this.loadData();
+    this.settings = {
+      targetFolder: (_a = data == null ? void 0 : data.targetFolder) != null ? _a : DEFAULT_SETTINGS.targetFolder,
+      enableMoveContext: (_b = data == null ? void 0 : data.enableMoveContext) != null ? _b : DEFAULT_SETTINGS.enableMoveContext,
+      enableCreateTodayFolder: (_c = data == null ? void 0 : data.enableCreateTodayFolder) != null ? _c : DEFAULT_SETTINGS.enableCreateTodayFolder,
+      enableCreateTodayNote: (_d = data == null ? void 0 : data.enableCreateTodayNote) != null ? _d : DEFAULT_SETTINGS.enableCreateTodayNote,
+      todayNoteFolder: (_e = data == null ? void 0 : data.todayNoteFolder) != null ? _e : DEFAULT_SETTINGS.todayNoteFolder,
+      todayDateFormat: (_f = data == null ? void 0 : data.todayDateFormat) != null ? _f : DEFAULT_SETTINGS.todayDateFormat,
+      ribbonTodayNoteTargets: (_g = data == null ? void 0 : data.ribbonTodayNoteTargets) != null ? _g : DEFAULT_SETTINGS.ribbonTodayNoteTargets,
+      todayNoteTemplate: (_h = data == null ? void 0 : data.todayNoteTemplate) != null ? _h : DEFAULT_SETTINGS.todayNoteTemplate,
+      enableRibbonTodayNote: (_i = data == null ? void 0 : data.enableRibbonTodayNote) != null ? _i : DEFAULT_SETTINGS.enableRibbonTodayNote
+    };
+    if (typeof this.settings.todayDateFormat !== "string") {
+      this.settings.todayDateFormat = DEFAULT_DATE_FORMAT;
+    }
+    if (!Array.isArray(data == null ? void 0 : data.ribbonTodayNoteTargets)) {
+      const folder = typeof (data == null ? void 0 : data.todayNoteFolder) === "string" ? data.todayNoteFolder.trim() : "";
+      this.settings.ribbonTodayNoteTargets = folder ? [{
+        name: folder.split("/").filter(Boolean).pop() || folder,
+        folder
+      }] : [];
+      await this.saveSettings();
+    }
+    this.settings.ribbonTodayNoteTargets = this.settings.ribbonTodayNoteTargets.map((target) => ({ name: target.name, folder: target.folder }));
+    await this.saveSettings();
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -189,11 +218,18 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     await this.app.fileManager.renameFile(folder, finalPath);
   }
   formatToday() {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
+    const format = (this.settings.todayDateFormat || "").trim() || DEFAULT_DATE_FORMAT;
+    let output = "";
+    try {
+      output = (0, import_obsidian.moment)().format(format).trim();
+    } catch (error) {
+      console.error("Date format error:", error);
+    }
+    if (!output || output === "." || output === ".." || output.endsWith(".") || UNSAFE_DATE_OUTPUT.test(output)) {
+      new import_obsidian.Notice(`\u65E5\u4ED8\u306E\u66F8\u5F0F\u300C${format}\u300D\u306E\u7D50\u679C\u304C\u30D5\u30A1\u30A4\u30EB\u540D\u306B\u4F7F\u3048\u306A\u3044\u305F\u3081\u3001${DEFAULT_DATE_FORMAT}\u3092\u4F7F\u7528\u3057\u307E\u3059\u3002`, 5e3);
+      return (0, import_obsidian.moment)().format(DEFAULT_DATE_FORMAT);
+    }
+    return output;
   }
   formatTime() {
     const now = new Date();
@@ -202,9 +238,8 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     return `${hh}:${min}`;
   }
   renderTemplate(content, title) {
-    const date = this.formatToday();
     const time = this.formatTime();
-    return content.replace(/\{\{\s*date\s*\}\}/gi, date).replace(/\{\{\s*time\s*\}\}/gi, time).replace(/\{\{\s*title\s*\}\}/gi, title);
+    return content.replace(/\{\{\s*date\s*\}\}/gi, title).replace(/\{\{\s*time\s*\}\}/gi, time).replace(/\{\{\s*title\s*\}\}/gi, title);
   }
   async getTodayNoteTemplateContent(baseName) {
     const templatePath = (this.settings.todayNoteTemplate || "").trim();
@@ -284,24 +319,26 @@ var FileMoverPlugin = class extends import_obsidian.Plugin {
     }
   }
   removeRibbonButton() {
-    var _a;
-    (_a = this.ribbonEl) == null ? void 0 : _a.remove();
-    this.ribbonEl = null;
+    for (const ribbon of this.ribbonEls)
+      ribbon.remove();
+    this.ribbonEls = [];
   }
   refreshRibbonButton() {
     this.removeRibbonButton();
     if (!this.settings.enableRibbonTodayNote)
       return;
-    const ribbon = this.addRibbonIcon("calendar-plus", "\u6307\u5B9A\u30D5\u30A9\u30EB\u30C0\u306B\u4ECA\u65E5\u306E\u65E5\u4ED8\u30CE\u30FC\u30C8\u3092\u4F5C\u6210", async () => {
-      const folderPath = (this.settings.todayNoteFolder || "").trim();
-      if (!folderPath) {
-        new import_obsidian.Notice("\u8A2D\u5B9A\u753B\u9762\u3067\u65E5\u4ED8\u30CE\u30FC\u30C8\u7528\u30D5\u30A9\u30EB\u30C0\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002", 5e3);
-        return;
-      }
-      await this.createTodayNote(null, folderPath);
-    });
-    ribbon.setAttribute("aria-label", "\u6307\u5B9A\u30D5\u30A9\u30EB\u30C0\u306B\u4ECA\u65E5\u306E\u65E5\u4ED8\u30CE\u30FC\u30C8\u3092\u4F5C\u6210");
-    this.ribbonEl = ribbon;
+    for (const target of this.settings.ribbonTodayNoteTargets) {
+      const folderPath = typeof target.folder === "string" ? target.folder.trim() : "";
+      if (!folderPath)
+        continue;
+      const label = (typeof target.name === "string" ? target.name.trim() : "") || folderPath;
+      const tooltip = `\u300C${label}\u300D(${folderPath})\u306B\u4ECA\u65E5\u306E\u65E5\u4ED8\u30CE\u30FC\u30C8\u3092\u4F5C\u6210`;
+      const ribbon = this.addRibbonIcon("calendar-plus", tooltip, async () => {
+        await this.createTodayNote(null, folderPath);
+      });
+      ribbon.setAttribute("aria-label", tooltip);
+      this.ribbonEls.push(ribbon);
+    }
   }
   getErrorMessage(error) {
     return error instanceof Error ? error.message : String(error);
@@ -332,10 +369,36 @@ var FileMoverSettingTab = class extends import_obsidian.PluginSettingTab {
       this.plugin.settings.enableCreateTodayNote = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("\u65E5\u4ED8\u30CE\u30FC\u30C8\u306E\u4FDD\u5B58\u5148\u30D5\u30A9\u30EB\u30C0").setDesc("\u30EA\u30DC\u30F3\u30DC\u30BF\u30F3\u304B\u3089\u4F5C\u6210\u3059\u308B\u65E5\u4ED8\u30CE\u30FC\u30C8\u306E\u4FDD\u5B58\u5148\u3092\u8A2D\u5B9A\u3057\u307E\u3059").addText((text) => text.setPlaceholder("Daily Notes").setValue(this.plugin.settings.todayNoteFolder).onChange(async (value) => {
-      this.plugin.settings.todayNoteFolder = value;
+    new import_obsidian.Setting(containerEl).setName("\u65E5\u4ED8\u30CE\u30FC\u30C8\u306E\u4FDD\u5B58\u5148\u30D5\u30A9\u30EB\u30C0").setDesc("\u30EA\u30DC\u30F3\u30DC\u30BF\u30F3\u3054\u3068\u306B\u8868\u793A\u540D\u3068\u4FDD\u5B58\u5148\u30D5\u30A9\u30EB\u30C0\u3092\u8A2D\u5B9A\u3057\u307E\u3059");
+    const targetsContainer = containerEl.createDiv();
+    this.plugin.settings.ribbonTodayNoteTargets.forEach((target, index) => {
+      const row = targetsContainer.createDiv();
+      new import_obsidian.Setting(row).setName(`\u30EA\u30DC\u30F3\u30DC\u30BF\u30F3 ${index + 1}`).addText((text) => text.setPlaceholder("\u8868\u793A\u540D").setValue(target.name).onChange(async (value) => {
+        target.name = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshRibbonButton();
+      }));
+      new import_obsidian.Setting(row).setName("\u4FDD\u5B58\u5148").addText((text) => text.setPlaceholder("Daily Notes").setValue(target.folder).onChange(async (value) => {
+        target.folder = value;
+        await this.plugin.saveSettings();
+        this.plugin.refreshRibbonButton();
+      }));
+      new import_obsidian.Setting(row).addButton((button) => button.setButtonText("\u524A\u9664").onClick(async () => {
+        this.plugin.settings.ribbonTodayNoteTargets.splice(index, 1);
+        await this.plugin.saveSettings();
+        this.plugin.refreshRibbonButton();
+        this.display();
+      }));
+    });
+    new import_obsidian.Setting(containerEl).addButton((button) => button.setButtonText("\u30DC\u30BF\u30F3\u3092\u8FFD\u52A0").onClick(async () => {
+      this.plugin.settings.ribbonTodayNoteTargets.push({ name: "", folder: "" });
       await this.plugin.saveSettings();
       this.plugin.refreshRibbonButton();
+      this.display();
+    }));
+    new import_obsidian.Setting(containerEl).setName("\u65E5\u4ED8\u306E\u66F8\u5F0F").setDesc("Moment\u5F62\u5F0F\u3067\u6307\u5B9A\u3057\u307E\u3059\u3002\u4F8B: YYYY-MM-DD\u3001YYYY\u5E74MM\u6708DD\u65E5\u3002\u30CE\u30FC\u30C8\u540D\u30FB\u65E5\u4ED8\u30D5\u30A9\u30EB\u30C0\u540D\u30FB\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8\u306E{{date}}\u306B\u9069\u7528\u3055\u308C\u307E\u3059\u3002").addMomentFormat((format) => format.setDefaultFormat(DEFAULT_DATE_FORMAT).setValue(this.plugin.settings.todayDateFormat).onChange(async (value) => {
+      this.plugin.settings.todayDateFormat = value;
+      await this.plugin.saveSettings();
     }));
     new import_obsidian.Setting(containerEl).setName("\u65E5\u4ED8\u30CE\u30FC\u30C8\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8").setDesc("\u65E5\u4ED8\u30CE\u30FC\u30C8\u4F5C\u6210\u6642\u306B\u8AAD\u307F\u8FBC\u3080\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8\u30CE\u30FC\u30C8\u306E\u30D1\u30B9\u3092\u8A2D\u5B9A\u3057\u307E\u3059").addText((text) => text.setPlaceholder("9_Template/daily-note").setValue(this.plugin.settings.todayNoteTemplate).onChange(async (value) => {
       this.plugin.settings.todayNoteTemplate = value;
